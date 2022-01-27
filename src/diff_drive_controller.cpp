@@ -18,9 +18,9 @@ using namespace std::chrono_literals;
 
 // Robot physical constants
 const double TICKS_PER_REVOLUTION = 700; // For reference purposes.
-const double WHEEL_RADIUS = 0.045; // Wheel radius in meters
+const double WHEEL_RADIUS = 0.04; // Wheel radius in meters
 const double WHEEL_BASE = 0.34; // Center of left tire to center of right tire
-const int TICKS_PER_METER = 2500; // Original was 2800
+const int TICKS_PER_METER = 2600; // Calculated is 2786 ticks, but a lower number makes the system more accurate (naybe due to slippage?)
 
 // Distance both wheels have traveled in meters between readings
 double distanceLeft = 0.0;

@@ -11,9 +11,10 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 add_executable(diff_drive_controller src/diff_drive_controller.cpp)
-ament_target_dependencies(diff_drive_controller rclcpp std_msgs nav_msgs sensor_msgs)
+ament_target_dependencies(diff_drive_controller rclcpp std_msgs nav_msgs sensor_msgs tf2_ros)
 
 install(TARGETS
   diff_drive_controller

@@ -18,9 +18,9 @@ using namespace std::chrono_literals;
 
 // Robot physical constants
 const double TICKS_PER_REVOLUTION = 700; // For reference purposes.
-const double WHEEL_RADIUS = 0.04; // Wheel radius in meters
-const double WHEEL_BASE = 0.34; // Center of left tire to center of right tire
-const int TICKS_PER_METER = 2600; // Calculated is 2786 ticks, but a lower number makes the system more accurate (naybe due to slippage?)
+const double WHEEL_RADIUS = 0.045; // Wheel radius in meters
+const double WHEEL_BASE = 0.35; // Center of left tire to center of right tire
+const int TICKS_PER_METER = 2560; // Calculated is 2786 ticks, but a lower number makes the system more accurate (naybe due to slippage?)
 
 // Distance both wheels have traveled in meters between readings
 double distanceLeft = 0.0;
@@ -40,6 +40,8 @@ const double initialY = 0.0;
 const double initialTheta = 0.00000000001;
 const double PI = 3.141592;
 
+bool broadcast_transform = false;
+
 rclcpp::Time lastJointStateTimeStamp;
 rclcpp::Time lastOdomStamp;
 
@@ -49,11 +51,14 @@ class DiffDriveController : public rclcpp::Node
     DiffDriveController()
     : Node("diff_drive_controller")
     {
+        this->declare_parameter("broadcast_transform", false);
+        this->get_parameter("broadcast_transform", broadcast_transform);
 
         lastJointStateTimeStamp = this->now();
         lastOdomStamp = lastJointStateTimeStamp;
 
     	odomNew.header.frame_id = "odom";
+    	odomNew.child_frame_id = "base_footprint";
         odomNew.pose.pose.position.z = 0;
         odomNew.pose.pose.orientation.x = 0;
         odomNew.pose.pose.orientation.y = 0;
@@ -87,9 +92,17 @@ class DiffDriveController : public rclcpp::Node
         publisher_ = this->create_publisher<nav_msgs::msg::Odometry>("odom_data_quat", sensor_qos);
         publisherQuat_ = this->create_publisher<nav_msgs::msg::Odometry>("odom_data_euler", sensor_qos);
         publisherJS_ = this->create_publisher<sensor_msgs::msg::JointState>("joint_states", sensor_qos);
-        timer_ = this->create_wall_timer(100ms, std::bind(&DiffDriveController::timer_callback, this));
 
-        tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
+        timer_ = this->create_wall_timer(66ms, std::bind(&DiffDriveController::timer_callback, this));
+
+        if (broadcast_transform) {
+            tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
+            RCLCPP_INFO(this->get_logger(), "Broadcasting transform");
+        }
+        else {
+            RCLCPP_INFO(this->get_logger(), "Will NOT broadcast transform");
+        }
+
     }
 
   private:
@@ -114,7 +127,7 @@ class DiffDriveController : public rclcpp::Node
         sensor_msgs::msg::JointState combined_joint_state;
 
         combined_joint_state.header.stamp = now;
-
+        //combined_joint_state.header.frame_id = "base_link";
         //right is pushed on first, and we need to consistent from here on out in this method
         combined_joint_state.name.push_back("drivewhl_r_joint");
         combined_joint_state.name.push_back("drivewhl_l_joint");
@@ -148,11 +161,11 @@ class DiffDriveController : public rclcpp::Node
 
         transform_stamped.header.stamp    = this->get_clock()->now();
         transform_stamped.header.frame_id = "odom";
-        transform_stamped.child_frame_id  = "base_link";
+        transform_stamped.child_frame_id  = "base_footprint";
 
         transform_stamped.transform.translation.x = odomNew.pose.pose.position.x;
-        transform_stamped.transform.translation.y = odomNew.pose.pose.position.x;
-        transform_stamped.transform.translation.z = odomNew.pose.pose.position.x;
+        transform_stamped.transform.translation.y = odomNew.pose.pose.position.y;
+        transform_stamped.transform.translation.z = odomNew.pose.pose.position.z;
 
         transform_stamped.transform.rotation.x = q.x();
         transform_stamped.transform.rotation.y = q.y();
@@ -160,6 +173,7 @@ class DiffDriveController : public rclcpp::Node
         transform_stamped.transform.rotation.w = q.w();
 
         tf_broadcaster_->sendTransform(transform_stamped);
+
     }
 
     void update_odam() const {
@@ -241,7 +255,7 @@ class DiffDriveController : public rclcpp::Node
         nav_msgs::msg::Odometry quatOdom;
         quatOdom.header.stamp = odomNew.header.stamp;
         quatOdom.header.frame_id = "odom";
-        quatOdom.child_frame_id = "base_link";
+        quatOdom.child_frame_id = "base_footprint";
         quatOdom.pose.pose.position.x = odomNew.pose.pose.position.x;
         quatOdom.pose.pose.position.y = odomNew.pose.pose.position.y;
         quatOdom.pose.pose.position.z = odomNew.pose.pose.position.z;
@@ -323,7 +337,10 @@ class DiffDriveController : public rclcpp::Node
     {
      	this->update_odam();
      	this->publish_quat();
-     	this->sendTransform();
+     	if (broadcast_transform) {
+            this->sendTransform();
+     	}
+
      	this->publish_joint_state();
     }
 
@@ -351,9 +368,9 @@ class DiffDriveController : public rclcpp::Node
     }
     void set_initial_2d(const geometry_msgs::msg::PoseStamped& rvizClick) const
     {
-        odomOld.pose.pose.position.x = rvizClick.pose.position.x;
-        odomOld.pose.pose.position.y = rvizClick.pose.position.y;
-        odomOld.pose.pose.orientation.z = rvizClick.pose.orientation.z;
+        odomNew.pose.pose.position.x = rvizClick.pose.position.x;
+        odomNew.pose.pose.position.y = rvizClick.pose.position.y;
+        odomNew.pose.pose.orientation.z = rvizClick.pose.orientation.z;
     }
 };
 
